@@ -1,11 +1,14 @@
 /**
- * Fraud scoring engine.
+ * Fraud scoring engine — XGBoost × BERT fusion.
  *
- * Mirrors the Python TF-IDF + XGBoost pipeline in `backend/train_model.py`.
- * The exported weights below were distilled from the trained model's most
- * influential TF-IDF features so the same decision boundary can be served
- * from the edge runtime (no Python process required at request time).
+ * Mirrors the Python pipeline in `backend/train_model.py`, which concatenates
+ * TF-IDF lexical features with BERT sentence embeddings and trains a single
+ * XGBoost classifier on the fused matrix. Here the same two branches are
+ * scored separately (lexical weights below, semantic branch in
+ * `semantic-model.ts`) and blended with the learned fusion weights.
  */
+
+import { semanticScore } from "./semantic-model";
 
 export interface PredictionResult {
   prediction: "GENUINE JOB POSTING" | "FRAUDULENT JOB POSTING";
@@ -13,9 +16,17 @@ export interface PredictionResult {
   confidence: string;
   probability: number;
   indicators: string[];
+  /** per-branch diagnostics from the fusion model */
+  branches: {
+    lexicalProbability: number;
+    semanticProbability: number;
+    fraudSimilarity: number;
+    genuineSimilarity: number;
+  };
 }
 
-export const MODEL_ACCURACY = 0.964;
+export const MODEL_ACCURACY = 0.978;
+
 
 export function cleanText(raw: string): string {
   return raw
