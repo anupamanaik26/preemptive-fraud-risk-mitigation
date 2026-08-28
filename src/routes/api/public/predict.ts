@@ -12,9 +12,10 @@ export const Route = createFileRoute("/api/public/predict")({
       GET: async () =>
         Response.json({
           message: "Recruitment Fraud Detection API Running",
-          model: "XGBoost + TF-IDF",
+          model: "XGBoost + TF-IDF + BERT fusion",
           accuracy: MODEL_ACCURACY,
         }),
+
       POST: async ({ request }) => {
         let payload: unknown;
         try {

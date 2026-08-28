@@ -1,9 +1,9 @@
 """
-Recruitment Fraud Detection — Flask REST API.
+Recruitment Fraud Detection — Flask REST API (XGBoost x BERT fusion).
 
 Endpoints:
   GET  /         -> {"message": "Recruitment Fraud Detection API Running"}
-  POST /predict  -> {"prediction": "...", "confidence": "96.5%"}
+  POST /predict  -> {"prediction": "...", "confidence": "96.5%", "branches": {...}}
 
 Run:  python app.py     (http://localhost:5000)
 """
@@ -13,8 +13,9 @@ import os
 import joblib
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from scipy.sparse import csr_matrix, hstack
 
-from train_model import clean_text
+from train_model import bert_embed, clean_text, load_bert
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "model")
 
@@ -23,6 +24,8 @@ CORS(app)
 
 model = joblib.load(os.path.join(MODEL_DIR, "xgboost_model.pkl"))
 tfidf = joblib.load(os.path.join(MODEL_DIR, "tfidf_vectorizer.pkl"))
+meta = joblib.load(os.path.join(MODEL_DIR, "meta.pkl"))
+encoder = load_bert()
 
 SCAM_INDICATORS = [
     ("unrealistic salary", ["guaranteed income", "unlimited income", "per day"]),
@@ -36,7 +39,13 @@ SCAM_INDICATORS = [
 
 @app.route("/", methods=["GET"])
 def index():
-    return jsonify({"message": "Recruitment Fraud Detection API Running"})
+    return jsonify(
+        {
+            "message": "Recruitment Fraud Detection API Running",
+            "model": "XGBoost + TF-IDF + BERT fusion",
+            "bert_model": meta.get("bert_model"),
+        }
+    )
 
 
 @app.route("/predict", methods=["POST"])
@@ -47,7 +56,12 @@ def predict():
         return jsonify({"error": "`job_description` is required"}), 400
 
     cleaned = clean_text(text)
-    features = tfidf.transform([cleaned])
+
+    # branch A: TF-IDF lexical | branch B: BERT semantic | fusion: hstack
+    lex = tfidf.transform([cleaned])
+    sem = bert_embed(encoder, [text])
+    features = hstack([lex, csr_matrix(sem)]).tocsr()
+
     proba = float(model.predict_proba(features)[0][1])
     fraudulent = proba >= 0.5
     confidence = proba if fraudulent else 1 - proba
@@ -67,6 +81,10 @@ def predict():
             "confidence": f"{confidence * 100:.1f}%",
             "probability": proba,
             "indicators": indicators,
+            "branches": {
+                "lexical_features": meta.get("lex_dim"),
+                "semantic_features": meta.get("sem_dim"),
+            },
         }
     )
 

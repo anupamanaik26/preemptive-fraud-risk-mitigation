@@ -13,8 +13,9 @@ export function Header() {
               Recruitment Fraud Detection
             </p>
             <p className="text-[11px] text-muted-foreground sm:text-xs">
-              XGBoost · TF-IDF · REST API
+              XGBoost × BERT fusion · REST API
             </p>
+
           </div>
         </div>
         <div className="hidden items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-medium text-success sm:flex">

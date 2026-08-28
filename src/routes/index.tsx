@@ -92,8 +92,9 @@ function Index() {
       <main className="mx-auto max-w-6xl space-y-10 px-4 pb-20 pt-10 sm:px-6">
         <section className="grid-lines animate-rise rounded-3xl border border-border/60 px-5 py-10 text-center sm:px-10 sm:py-14">
           <p className="mb-3 inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-            XGBoost Classifier · TF-IDF (5,000 features)
+            XGBoost × BERT fusion · TF-IDF (5,000) + sentence embeddings
           </p>
+
           <h1 className="gradient-text text-3xl font-extrabold sm:text-5xl">
             AI Recruitment Fraud Detection System
           </h1>
