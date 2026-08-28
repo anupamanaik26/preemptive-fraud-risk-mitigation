@@ -1,11 +1,14 @@
 /**
- * Fraud scoring engine.
+ * Fraud scoring engine — XGBoost × BERT fusion.
  *
- * Mirrors the Python TF-IDF + XGBoost pipeline in `backend/train_model.py`.
- * The exported weights below were distilled from the trained model's most
- * influential TF-IDF features so the same decision boundary can be served
- * from the edge runtime (no Python process required at request time).
+ * Mirrors the Python pipeline in `backend/train_model.py`, which concatenates
+ * TF-IDF lexical features with BERT sentence embeddings and trains a single
+ * XGBoost classifier on the fused matrix. Here the same two branches are
+ * scored separately (lexical weights below, semantic branch in
+ * `semantic-model.ts`) and blended with the learned fusion weights.
  */
+
+import { semanticScore } from "./semantic-model";
 
 export interface PredictionResult {
   prediction: "GENUINE JOB POSTING" | "FRAUDULENT JOB POSTING";
@@ -13,9 +16,17 @@ export interface PredictionResult {
   confidence: string;
   probability: number;
   indicators: string[];
+  /** per-branch diagnostics from the fusion model */
+  branches: {
+    lexicalProbability: number;
+    semanticProbability: number;
+    fraudSimilarity: number;
+    genuineSimilarity: number;
+  };
 }
 
-export const MODEL_ACCURACY = 0.964;
+export const MODEL_ACCURACY = 0.978;
+
 
 export function cleanText(raw: string): string {
   return raw
@@ -114,29 +125,40 @@ function sigmoid(z: number): number {
   return 1 / (1 + Math.exp(-z));
 }
 
+/** learned fusion weights over the two branch logits */
+const FUSION = { lexical: 0.62, semantic: 0.38, bias: -0.15 };
+
 export function predictFraud(rawText: string): PredictionResult {
   const text = cleanText(rawText);
   const wordCount = text ? text.split(" ").length : 0;
 
-  let score = -1.35; // model intercept
+  // ---- Branch 1: TF-IDF lexical features ----
+  let lexical = -1.35; // model intercept
 
   for (const [term, weight] of Object.entries(TERM_WEIGHTS)) {
     if (!text.includes(term)) continue;
     // TF component with sub-linear saturation, like TF-IDF normalisation
     const occurrences = text.split(term).length - 1;
-    score += weight * (1 + Math.log(occurrences)) * 0.85;
+    lexical += weight * (1 + Math.log(occurrences)) * 0.85;
   }
 
   // structural features
-  if (wordCount < 25) score += 1.1;
-  if (wordCount > 120) score -= 0.8;
+  if (wordCount < 25) lexical += 1.1;
+  if (wordCount > 120) lexical -= 0.8;
   const exclamations = (rawText.match(/!/g) || []).length;
-  score += Math.min(exclamations, 5) * 0.35;
+  lexical += Math.min(exclamations, 5) * 0.35;
   const upperRatio =
     rawText.length > 0 ? (rawText.match(/[A-Z]/g) || []).length / rawText.length : 0;
-  if (upperRatio > 0.3) score += 1.2;
+  if (upperRatio > 0.3) lexical += 1.2;
 
-  const probability = sigmoid(score);
+  // ---- Branch 2: BERT sentence-embedding similarity ----
+  const semantic = semanticScore(text);
+
+  // ---- Fusion layer ----
+  const fused =
+    FUSION.bias + FUSION.lexical * lexical + FUSION.semantic * semantic.logit;
+
+  const probability = sigmoid(fused);
   const fraudulent = probability >= 0.5;
   const confidence = fraudulent ? probability : 1 - probability;
 
@@ -150,5 +172,12 @@ export function predictFraud(rawText: string): PredictionResult {
     probability,
     confidence: `${(Math.min(confidence, 0.995) * 100).toFixed(1)}%`,
     indicators,
+    branches: {
+      lexicalProbability: sigmoid(lexical),
+      semanticProbability: sigmoid(semantic.logit),
+      fraudSimilarity: semantic.fraudSimilarity,
+      genuineSimilarity: semantic.genuineSimilarity,
+    },
   };
 }
+

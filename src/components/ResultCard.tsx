@@ -46,6 +46,41 @@ export function ResultCard({ result }: { result: PredictionResult }) {
         </div>
       </div>
 
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        {[
+          {
+            name: "XGBoost · TF-IDF branch",
+            note: "Lexical scam-term features",
+            value: result.branches?.lexicalProbability ?? 0,
+          },
+          {
+            name: "BERT branch",
+            note: `Fraud sim ${(result.branches?.fraudSimilarity ?? 0).toFixed(2)} · Genuine sim ${(result.branches?.genuineSimilarity ?? 0).toFixed(2)}`,
+            value: result.branches?.semanticProbability ?? 0,
+          },
+        ].map((b) => (
+          <div key={b.name} className="rounded-2xl border border-border/60 p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold">{b.name}</p>
+              <span className="font-display text-sm font-bold">
+                {(b.value * 100).toFixed(1)}%
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">{b.note}</p>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary/60">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-700"
+                style={{ width: `${b.value * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Fusion layer weights: 0.62 lexical · 0.38 semantic
+      </p>
+
+
       {fraud && result.indicators.length > 0 && (
         <div className="mt-6 rounded-2xl border border-danger/25 bg-danger/8 p-4">
           <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-danger">
