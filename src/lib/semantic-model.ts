@@ -25,21 +25,23 @@ export function embed(text: string): Float64Array {
   const v = new Float64Array(DIM);
   const words = text.split(" ").filter(Boolean);
   for (let i = 0; i < words.length; i++) {
-    v[hash(words[i])] += 1;
-    if (i + 1 < words.length) v[hash(`${words[i]} ${words[i + 1]}`)] += 0.8;
-    if (i + 2 < words.length)
-      v[hash(`${words[i]} ${words[i + 1]} ${words[i + 2]}`)] += 0.6;
+    const w0 = words[i] as string;
+    v[hash(w0)]! += 1;
+    const w1 = words[i + 1];
+    if (w1 !== undefined) v[hash(`${w0} ${w1}`)]! += 0.8;
+    const w2 = words[i + 2];
+    if (w1 !== undefined && w2 !== undefined) v[hash(`${w0} ${w1} ${w2}`)]! += 0.6;
   }
   let norm = 0;
-  for (let i = 0; i < DIM; i++) norm += v[i] * v[i];
+  for (let i = 0; i < DIM; i++) norm += v[i]! * v[i]!;
   norm = Math.sqrt(norm) || 1;
-  for (let i = 0; i < DIM; i++) v[i] /= norm;
+  for (let i = 0; i < DIM; i++) v[i]! /= norm;
   return v;
 }
 
 export function cosine(a: Float64Array, b: Float64Array): number {
   let dot = 0;
-  for (let i = 0; i < DIM; i++) dot += a[i] * b[i];
+  for (let i = 0; i < DIM; i++) dot += a[i]! * b[i]!;
   return dot;
 }
 
@@ -64,12 +66,12 @@ function centroid(corpus: string[]): Float64Array {
   const c = new Float64Array(DIM);
   for (const doc of corpus) {
     const e = embed(doc);
-    for (let i = 0; i < DIM; i++) c[i] += e[i];
+    for (let i = 0; i < DIM; i++) c[i]! += e[i]!;
   }
   let norm = 0;
-  for (let i = 0; i < DIM; i++) norm += c[i] * c[i];
+  for (let i = 0; i < DIM; i++) norm += c[i]! * c[i]!;
   norm = Math.sqrt(norm) || 1;
-  for (let i = 0; i < DIM; i++) c[i] /= norm;
+  for (let i = 0; i < DIM; i++) c[i]! /= norm;
   return c;
 }
 
