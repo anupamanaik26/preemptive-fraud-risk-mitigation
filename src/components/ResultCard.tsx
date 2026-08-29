@@ -3,33 +3,37 @@ import type { PredictionResult } from "@/lib/fraud-model";
 
 export function ResultCard({ result }: { result: PredictionResult }) {
   const fraud = result.label === "fraudulent";
+  const suspicious = result.prediction === "SUSPICIOUS JOB POSTING";
   const pct = Number(result.confidence.replace("%", ""));
 
+  const tone = suspicious
+    ? { text: "text-warning", bg: "bg-warning/15", ring: "ring-warning/40", title: "Suspicious Job Posting" }
+    : fraud
+      ? { text: "text-danger", bg: "bg-danger/15", ring: "ring-danger/40", title: "Fraudulent Job Posting" }
+      : { text: "text-success", bg: "bg-success/15", ring: "ring-success/40", title: "Genuine Job Posting" };
+
   return (
-    <section
-      className={`glass-card animate-rise rounded-3xl p-5 sm:p-7 ${
-        fraud ? "ring-1 ring-danger/40" : "ring-1 ring-success/40"
-      }`}
-    >
+    <section className={`glass-card animate-rise rounded-3xl p-5 ring-1 sm:p-7 ${tone.ring}`}>
       <div className="flex items-start gap-4">
         <span
-          className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${
-            fraud ? "bg-danger/15 text-danger" : "bg-success/15 text-success"
-          }`}
+          className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${tone.bg} ${tone.text}`}
         >
-          {fraud ? <XCircle className="size-6" /> : <CheckCircle2 className="size-6" />}
+          {suspicious ? (
+            <AlertTriangle className="size-6" />
+          ) : fraud ? (
+            <XCircle className="size-6" />
+          ) : (
+            <CheckCircle2 className="size-6" />
+          )}
         </span>
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-widest text-muted-foreground">
             Model verdict
           </p>
-          <h3
-            className={`text-xl font-bold sm:text-2xl ${fraud ? "text-danger" : "text-success"}`}
-          >
-            {fraud ? "Fraudulent Job Posting" : "Genuine Job Posting"}
-          </h3>
+          <h3 className={`text-xl font-bold sm:text-2xl ${tone.text}`}>{tone.title}</h3>
         </div>
       </div>
+
 
       <div className="mt-6">
         <div className="mb-2 flex items-center justify-between text-sm">

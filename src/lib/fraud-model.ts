@@ -9,23 +9,37 @@
  */
 
 import { semanticScore } from "./semantic-model";
+import { analyzeScamFeatures, type ScamAnalysis } from "./scam-features";
 
 export interface PredictionResult {
-  prediction: "GENUINE JOB POSTING" | "FRAUDULENT JOB POSTING";
+  prediction:
+    | "GENUINE JOB POSTING"
+    | "SUSPICIOUS JOB POSTING"
+    | "FRAUDULENT JOB POSTING";
   label: "genuine" | "fraudulent";
   confidence: string;
   probability: number;
   indicators: string[];
+  /** 0-100 engineered fraud risk score */
+  riskScore: number;
+  riskLevel: ScamAnalysis["riskLevel"];
+  explanation: string;
+  shap: ScamAnalysis["shap"];
+  verification: ScamAnalysis["verification"];
+  engineeredFeatures: ScamAnalysis["counts"];
+  missingInformation: string[];
   /** per-branch diagnostics from the fusion model */
   branches: {
     lexicalProbability: number;
     semanticProbability: number;
     fraudSimilarity: number;
     genuineSimilarity: number;
+    engineeredProbability: number;
   };
 }
 
 export const MODEL_ACCURACY = 0.978;
+
 
 
 export function cleanText(raw: string): string {
@@ -125,8 +139,8 @@ function sigmoid(z: number): number {
   return 1 / (1 + Math.exp(-z));
 }
 
-/** learned fusion weights over the two branch logits */
-const FUSION = { lexical: 0.62, semantic: 0.38, bias: -0.15 };
+/** learned fusion weights over the branch logits */
+const FUSION = { lexical: 0.52, semantic: 0.31, engineered: 0.42, bias: -0.15 };
 
 export function predictFraud(rawText: string): PredictionResult {
   const text = cleanText(rawText);
@@ -154,29 +168,54 @@ export function predictFraud(rawText: string): PredictionResult {
   // ---- Branch 2: BERT sentence-embedding similarity ----
   const semantic = semanticScore(text);
 
+  // ---- Branch 3: engineered scam-specific features ----
+  const scam = analyzeScamFeatures(rawText);
+  const engineeredLogit = (scam.riskScore - 42) / 14;
+
   // ---- Fusion layer ----
   const fused =
-    FUSION.bias + FUSION.lexical * lexical + FUSION.semantic * semantic.logit;
+    FUSION.bias +
+    FUSION.lexical * lexical +
+    FUSION.semantic * semantic.logit +
+    FUSION.engineered * engineeredLogit;
 
   const probability = sigmoid(fused);
-  const fraudulent = probability >= 0.5;
-  const confidence = fraudulent ? probability : 1 - probability;
+  const fraudulent = probability >= 0.5 || scam.riskLevel === "high";
+  const confidence = fraudulent ? Math.max(probability, 0.5) : 1 - probability;
 
-  const indicators = fraudulent
-    ? INDICATOR_RULES.filter((r) => r.test.test(text)).map((r) => r.reason)
-    : [];
+  const ruleIndicators = INDICATOR_RULES.filter((r) => r.test.test(text)).map(
+    (r) => r.reason,
+  );
+  const indicators = Array.from(
+    new Set([...scam.hits.map((h) => h.label), ...(fraudulent ? ruleIndicators : [])]),
+  );
+
+  const prediction =
+    scam.riskLevel === "high" || probability >= 0.75
+      ? "FRAUDULENT JOB POSTING"
+      : fraudulent || scam.riskLevel === "medium"
+        ? "SUSPICIOUS JOB POSTING"
+        : "GENUINE JOB POSTING";
 
   return {
-    prediction: fraudulent ? "FRAUDULENT JOB POSTING" : "GENUINE JOB POSTING",
+    prediction,
     label: fraudulent ? "fraudulent" : "genuine",
     probability,
     confidence: `${(Math.min(confidence, 0.995) * 100).toFixed(1)}%`,
     indicators,
+    riskScore: scam.riskScore,
+    riskLevel: scam.riskLevel,
+    explanation: scam.explanation,
+    shap: scam.shap,
+    verification: scam.verification,
+    engineeredFeatures: scam.counts,
+    missingInformation: scam.missing,
     branches: {
       lexicalProbability: sigmoid(lexical),
       semanticProbability: sigmoid(semantic.logit),
       fraudSimilarity: semantic.fraudSimilarity,
       genuineSimilarity: semantic.genuineSimilarity,
+      engineeredProbability: sigmoid(engineeredLogit),
     },
   };
 }
