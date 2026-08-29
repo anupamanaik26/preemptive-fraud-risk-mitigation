@@ -9,23 +9,37 @@
  */
 
 import { semanticScore } from "./semantic-model";
+import { analyzeScamFeatures, type ScamAnalysis } from "./scam-features";
 
 export interface PredictionResult {
-  prediction: "GENUINE JOB POSTING" | "FRAUDULENT JOB POSTING";
+  prediction:
+    | "GENUINE JOB POSTING"
+    | "SUSPICIOUS JOB POSTING"
+    | "FRAUDULENT JOB POSTING";
   label: "genuine" | "fraudulent";
   confidence: string;
   probability: number;
   indicators: string[];
+  /** 0-100 engineered fraud risk score */
+  riskScore: number;
+  riskLevel: ScamAnalysis["riskLevel"];
+  explanation: string;
+  shap: ScamAnalysis["shap"];
+  verification: ScamAnalysis["verification"];
+  engineeredFeatures: ScamAnalysis["counts"];
+  missingInformation: string[];
   /** per-branch diagnostics from the fusion model */
   branches: {
     lexicalProbability: number;
     semanticProbability: number;
     fraudSimilarity: number;
     genuineSimilarity: number;
+    engineeredProbability: number;
   };
 }
 
 export const MODEL_ACCURACY = 0.978;
+
 
 
 export function cleanText(raw: string): string {
