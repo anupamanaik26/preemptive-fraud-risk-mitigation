@@ -121,7 +121,16 @@ function Index() {
           </div>
         )}
 
-        {result && <ResultCard result={result} />}
+        {result && (
+          <div className="space-y-6">
+            <ResultCard result={result} />
+            <RiskMeter result={result} />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <ShapExplanation result={result} />
+              <CompanyVerificationCard result={result} />
+            </div>
+          </div>
+        )}
 
         <Dashboard history={history} />
         <History items={history} onClear={() => persist([])} />
