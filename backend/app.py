@@ -16,6 +16,7 @@ from flask_cors import CORS
 from scipy.sparse import csr_matrix, hstack
 
 from train_model import bert_embed, clean_text, load_bert
+from scam_features import FEATURE_NAMES, explain, extract_features, risk_score
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "model")
 
