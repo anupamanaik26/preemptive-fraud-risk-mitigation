@@ -43,14 +43,14 @@ export function ResultCard({ result }: { result: PredictionResult }) {
         <div className="h-3 w-full overflow-hidden rounded-full bg-secondary/60">
           <div
             className={`h-full rounded-full transition-[width] duration-700 ease-out ${
-              fraud ? "bg-danger" : "bg-success"
+              suspicious ? "bg-warning" : fraud ? "bg-danger" : "bg-success"
             }`}
             style={{ width: `${pct}%` }}
           />
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
         {[
           {
             name: "XGBoost · TF-IDF branch",
@@ -61,6 +61,11 @@ export function ResultCard({ result }: { result: PredictionResult }) {
             name: "BERT branch",
             note: `Fraud sim ${(result.branches?.fraudSimilarity ?? 0).toFixed(2)} · Genuine sim ${(result.branches?.genuineSimilarity ?? 0).toFixed(2)}`,
             value: result.branches?.semanticProbability ?? 0,
+          },
+          {
+            name: "Engineered features",
+            note: `${result.engineeredFeatures?.urgency ?? 0} urgency · ${result.engineeredFeatures?.referralCode ?? 0} referral · ${result.engineeredFeatures?.brands ?? 0} brand · ${result.engineeredFeatures?.urls ?? 0} links`,
+            value: result.branches?.engineeredProbability ?? 0,
           },
         ].map((b) => (
           <div key={b.name} className="rounded-2xl border border-border/60 p-4">
@@ -81,8 +86,9 @@ export function ResultCard({ result }: { result: PredictionResult }) {
         ))}
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        Fusion layer weights: 0.62 lexical · 0.38 semantic
+        Fusion layer weights: 0.52 lexical · 0.31 semantic · 0.42 engineered
       </p>
+
 
 
       {fraud && result.indicators.length > 0 && (
