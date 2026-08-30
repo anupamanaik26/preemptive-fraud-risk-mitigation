@@ -106,10 +106,17 @@ def main() -> None:
     X_sem = bert_embed(encoder, df["raw_text"].tolist())
     print(f"BERT branch   : {X_sem.shape}  ({BERT_MODEL})")
 
-    # ---- Fusion: concatenate sparse lexical + dense semantic features ----
-    X = hstack([X_lex, csr_matrix(X_sem)]).tocsr()
+    # ---- Branch C: engineered scam-specific features ----
+    from scam_features import FEATURE_NAMES, extract_features
+
+    X_eng = np.array([extract_features(t)[0] for t in df["raw_text"]], dtype=float)
+    print(f"Engineered    : {X_eng.shape}  ({', '.join(FEATURE_NAMES)})")
+
+    # ---- Fusion: sparse lexical + dense semantic + engineered features ----
+    X = hstack([X_lex, csr_matrix(X_sem), csr_matrix(X_eng)]).tocsr()
     y = df["fraudulent"].values
     print(f"Fused matrix  : {X.shape}")
+
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
