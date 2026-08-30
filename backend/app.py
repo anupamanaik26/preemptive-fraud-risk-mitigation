@@ -57,36 +57,63 @@ def predict():
 
     cleaned = clean_text(text)
 
-    # branch A: TF-IDF lexical | branch B: BERT semantic | fusion: hstack
+    # branch A: TF-IDF lexical | branch B: BERT semantic | branch C: engineered
     lex = tfidf.transform([cleaned])
     sem = bert_embed(encoder, [text])
-    features = hstack([lex, csr_matrix(sem)]).tocsr()
+    eng_vec, detail = extract_features(text)
+    features = hstack([lex, csr_matrix(sem), csr_matrix([eng_vec])]).tocsr()
 
     proba = float(model.predict_proba(features)[0][1])
-    fraudulent = proba >= 0.5
+    score, level = risk_score(detail)
+    fraudulent = proba >= 0.5 or level == "high"
     confidence = proba if fraudulent else 1 - proba
 
-    indicators = []
-    if fraudulent:
-        indicators = [
-            reason
-            for reason, keys in SCAM_INDICATORS
-            if any(k in cleaned for k in keys)
-        ]
+    # SHAP explanation over the engineered feature block
+    try:
+        import shap
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(features)[0]
+        eng_shap = shap_values[-len(FEATURE_NAMES):]
+        top = sorted(
+            zip(FEATURE_NAMES, [float(v) for v in eng_shap]),
+            key=lambda kv: abs(kv[1]),
+            reverse=True,
+        )
+    except Exception:  # shap optional at runtime
+        top = [(n, 0.0) for n in FEATURE_NAMES]
+
+    indicators = [
+        reason for reason, keys in SCAM_INDICATORS if any(k in cleaned for k in keys)
+    ]
 
     return jsonify(
         {
-            "prediction": "FRAUDULENT JOB POSTING" if fraudulent else "GENUINE JOB POSTING",
+            "prediction": (
+                "FRAUDULENT JOB POSTING" if level == "high" or proba >= 0.75
+                else "SUSPICIOUS JOB POSTING" if fraudulent or level == "medium"
+                else "GENUINE JOB POSTING"
+            ),
             "label": "fraudulent" if fraudulent else "genuine",
             "confidence": f"{confidence * 100:.1f}%",
             "probability": proba,
+            "risk_score": score,
+            "risk_level": level,
+            "explanation": explain(detail, score, level),
+            "shap_values": [{"feature": f, "value": v} for f, v in top],
+            "top_features": [f for f, _ in top[:5]],
+            "verification": detail["verification"],
+            "missing_information": detail["missing"],
+            "engineered_features": dict(zip(FEATURE_NAMES, eng_vec)),
             "indicators": indicators,
             "branches": {
                 "lexical_features": meta.get("lex_dim"),
                 "semantic_features": meta.get("sem_dim"),
+                "engineered_features": len(FEATURE_NAMES),
             },
         }
     )
+
 
 
 if __name__ == "__main__":
