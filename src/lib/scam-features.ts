@@ -356,7 +356,10 @@ function pointsFor(base: number, count: number): number {
   return Math.round(base * Math.min(1, 0.7 + 0.3 * Math.log2(count + 1)));
 }
 
-export function analyzeScamFeatures(raw: string): ScamAnalysis {
+export function analyzeScamFeatures(
+  raw: string,
+  lookup?: CompanyLookupResult | null,
+): ScamAnalysis {
   const lower = raw.toLowerCase();
   const compact = lower.replace(/\s+/g, " ");
 
@@ -370,7 +373,7 @@ export function analyzeScamFeatures(raw: string): ScamAnalysis {
   const urls = extractUrls(raw);
 
   const missing = MISSING_CHECKS.filter((c) => !c.test.test(compact)).map((c) => c.label);
-  const verification = verifyCompany(raw, compact, brands);
+  const verification = verifyCompany(raw, compact, brands, lookup);
 
   const hits: FeatureHit[] = [];
   const push = (key: string, label: string, matches: string[], base: number) => {
