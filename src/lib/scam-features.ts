@@ -232,7 +232,7 @@ function extractEmails(raw: string): string[] {
   return raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) ?? [];
 }
 
-function extractCompanyName(raw: string): string | null {
+export function extractCompanyName(raw: string): string | null {
   const labelled = raw.match(
     /\b(?:company|organi[sz]ation|employer|hiring partner)\s*[:\-]\s*([A-Za-z0-9&.,'\- ]{2,60})/i,
   );
@@ -247,12 +247,10 @@ function extractCompanyName(raw: string): string | null {
   return atCompany?.[1] ?? null;
 }
 
-function verifyCompany(raw: string, lower: string, brands: string[]): CompanyVerification {
-  const companyName = extractCompanyName(raw);
+/** Details found directly in the posting, before any public lookup. */
+export function extractPostingCompanyDetails(raw: string) {
   const urls = extractUrls(raw);
   const emails = extractEmails(raw);
-  const notes: string[] = [];
-
   const linkedin = urls.find((u) => /linkedin\.com\/(company|school)\//i.test(u)) ?? null;
   const website =
     urls.find(
@@ -261,22 +259,69 @@ function verifyCompany(raw: string, lower: string, brands: string[]): CompanyVer
           u,
         ),
     ) ?? null;
-
   const corporate = emails.find((e) => {
     const domain = e.split("@")[1]?.toLowerCase() ?? "";
     return domain.length > 0 && !FREE_MAIL.includes(domain);
   });
-  const emailDomain = corporate ? (corporate.split("@")[1]?.toLowerCase() ?? null) : null;
+  return {
+    companyName: extractCompanyName(raw),
+    website,
+    linkedin,
+    emailDomain: corporate ? (corporate.split("@")[1]?.toLowerCase() ?? null) : null,
+    emailCount: emails.length,
+  };
+}
 
-  if (!website) notes.push("No official company website found in the posting.");
-  if (!linkedin) notes.push("No LinkedIn company page referenced.");
+function verifyCompany(
+  raw: string,
+  lower: string,
+  brands: string[],
+  lookup?: CompanyLookupResult | null,
+): CompanyVerification {
+  const posted = extractPostingCompanyDetails(raw);
+  const notes: string[] = [];
+
+  const website = posted.website ?? lookup?.website ?? null;
+  const linkedin = posted.linkedin ?? lookup?.linkedin ?? null;
+  const emailDomain = posted.emailDomain ?? lookup?.emailDomain ?? null;
+
+  const origin = {
+    website: website ? (posted.website ? "posting" : "public-lookup") : null,
+    linkedin: linkedin ? (posted.linkedin ? "posting" : "public-lookup") : null,
+    emailDomain: emailDomain ? (posted.emailDomain ? "posting" : "public-lookup") : null,
+  } as CompanyVerification["origin"];
+
+  if (!website) {
+    notes.push(
+      posted.companyName
+        ? `No official website for "${posted.companyName}" found in the posting or in public company directories.`
+        : "No official company website found in the posting.",
+    );
+  } else if (origin.website === "public-lookup") {
+    notes.push(`Official website resolved from public sources: ${website}`);
+  }
+
+  if (!linkedin) notes.push("No LinkedIn company page found for the named company.");
+  else if (origin.linkedin === "public-lookup") {
+    notes.push(`LinkedIn company page resolved from public search: ${linkedin}`);
+  }
+
   if (!emailDomain) {
     notes.push(
-      emails.length > 0
+      posted.emailCount > 0
         ? "Contact email uses a free consumer mail provider, not a corporate domain."
-        : "No contact email address provided.",
+        : "No corporate email domain could be established for this company.",
+    );
+  } else if (origin.emailDomain === "public-lookup") {
+    notes.push(`Corporate domain matched to the company record: ${emailDomain}`);
+  }
+
+  if (posted.emailCount > 0 && !posted.emailDomain && emailDomain) {
+    notes.push(
+      "The posting contacts you from a free mail account even though the company has its own domain.",
     );
   }
+
   if (brands.length > 0 && !website && !emailDomain) {
     notes.push(
       `Well-known brand name(s) (${brands.join(", ")}) used with no verifiable company details.`,
@@ -291,8 +336,20 @@ function verifyCompany(raw: string, lower: string, brands: string[]): CompanyVer
   const score = Math.round((passed / 3) * 100);
   const status: VerificationStatus = passed === 3 ? "verified" : passed >= 1 ? "partial" : "unverified";
 
-  return { companyName, website, linkedin, emailDomain, checks, score, status, notes };
+  return {
+    companyName: posted.companyName,
+    website,
+    linkedin,
+    emailDomain,
+    checks,
+    origin,
+    lookupSources: lookup?.sources ?? [],
+    score,
+    status,
+    notes,
+  };
 }
+
 
 function pointsFor(base: number, count: number): number {
   // saturating contribution: repeated hits of one category add less each time
