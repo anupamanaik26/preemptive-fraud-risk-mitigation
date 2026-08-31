@@ -9,7 +9,11 @@
  */
 
 import { semanticScore } from "./semantic-model";
-import { analyzeScamFeatures, type ScamAnalysis } from "./scam-features";
+import {
+  analyzeScamFeatures,
+  type CompanyLookupResult,
+  type ScamAnalysis,
+} from "./scam-features";
 
 export interface PredictionResult {
   prediction:
@@ -142,7 +146,10 @@ function sigmoid(z: number): number {
 /** learned fusion weights over the branch logits */
 const FUSION = { lexical: 0.52, semantic: 0.31, engineered: 0.42, bias: -0.15 };
 
-export function predictFraud(rawText: string): PredictionResult {
+export function predictFraud(
+  rawText: string,
+  companyLookup?: CompanyLookupResult | null,
+): PredictionResult {
   const text = cleanText(rawText);
   const wordCount = text ? text.split(" ").length : 0;
 
@@ -169,7 +176,7 @@ export function predictFraud(rawText: string): PredictionResult {
   const semantic = semanticScore(text);
 
   // ---- Branch 3: engineered scam-specific features ----
-  const scam = analyzeScamFeatures(rawText);
+  const scam = analyzeScamFeatures(rawText, companyLookup);
   const engineeredLogit = (scam.riskScore - 42) / 14;
 
   // ---- Fusion layer ----

@@ -12,11 +12,13 @@ function Row({
   label,
   ok,
   value,
+  origin,
 }: {
   icon: React.ReactNode;
   label: string;
   ok: boolean;
   value: string | null;
+  origin?: "posting" | "public-lookup" | null;
 }) {
   return (
     <li className="flex items-center gap-3 rounded-2xl border border-border/60 p-3">
@@ -24,8 +26,13 @@ function Row({
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{label}</p>
         <p className="truncate text-[11px] text-muted-foreground">
-          {value ?? "Not found in posting"}
+          {value ?? "Not found in posting or public sources"}
         </p>
+        {ok && origin && (
+          <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/80">
+            {origin === "posting" ? "From posting" : "Verified via public sources"}
+          </p>
+        )}
       </div>
       {ok ? (
         <BadgeCheck className="size-4 shrink-0 text-success" />
@@ -35,6 +42,7 @@ function Row({
     </li>
   );
 }
+
 
 export function CompanyVerificationCard({ result }: { result: PredictionResult }) {
   const v = result.verification;
@@ -68,10 +76,16 @@ export function CompanyVerificationCard({ result }: { result: PredictionResult }
       </div>
 
       <ul className="grid gap-3 sm:grid-cols-3">
-        <Row icon={<Globe className="size-4" />} label="Official website" ok={v.checks.website} value={v.website} />
-        <Row icon={<Linkedin className="size-4" />} label="LinkedIn page" ok={v.checks.linkedin} value={v.linkedin} />
-        <Row icon={<Mail className="size-4" />} label="Corporate email domain" ok={v.checks.emailDomain} value={v.emailDomain} />
+        <Row icon={<Globe className="size-4" />} label="Official website" ok={v.checks.website} value={v.website} origin={v.origin?.website} />
+        <Row icon={<Linkedin className="size-4" />} label="LinkedIn page" ok={v.checks.linkedin} value={v.linkedin} origin={v.origin?.linkedin} />
+        <Row icon={<Mail className="size-4" />} label="Corporate email domain" ok={v.checks.emailDomain} value={v.emailDomain} origin={v.origin?.emailDomain} />
       </ul>
+
+      {v.lookupSources?.length > 0 && (
+        <p className="mt-4 text-[11px] text-muted-foreground">
+          Checked against public sources: {v.lookupSources.join(" · ")}
+        </p>
+      )}
 
       {v.notes.length > 0 && (
         <ul className="mt-4 space-y-2">

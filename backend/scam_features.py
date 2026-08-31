@@ -7,6 +7,45 @@ and are also used by app.py to produce the risk score and explanation.
 
 import re
 
+try:
+    import requests
+except Exception:  # lookup is optional
+    requests = None
+
+
+def lookup_company(name):
+    """Resolve website / email domain / LinkedIn for a company name using
+    trusted public sources (Clearbit directory + DuckDuckGo for LinkedIn)."""
+    if not name or requests is None:
+        return {"website": None, "linkedin": None, "email_domain": None, "sources": []}
+    out = {"website": None, "linkedin": None, "email_domain": None, "sources": []}
+    try:
+        r = requests.get(
+            "https://autocomplete.clearbit.com/v1/companies/suggest",
+            params={"query": name}, timeout=4,
+        )
+        items = r.json() if r.ok else []
+        if items and items[0].get("domain"):
+            domain = items[0]["domain"].lower()
+            out["website"] = f"https://{domain}"
+            out["email_domain"] = domain
+            out["sources"].append("Clearbit company directory")
+    except Exception:
+        pass
+    try:
+        r = requests.get(
+            "https://html.duckduckgo.com/html/",
+            params={"q": f"{name} site:linkedin.com/company"},
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=4,
+        )
+        m = re.search(r"https?://[a-z.]*linkedin\.com/company/[A-Za-z0-9_-]+", r.text or "")
+        if m:
+            out["linkedin"] = m.group(0)
+            out["sources"].append("LinkedIn company page (public search)")
+    except Exception:
+        pass
+    return out
+
 GENERIC_GREETINGS = [
     "dear student", "dear candidate", "dear applicant", "greetings applicant",
     "greetings candidate", "congratulations", "congrats",
@@ -54,6 +93,14 @@ def _hits(text, phrases):
     return [p for p in phrases if p in text]
 
 
+def extract_company_name(raw):
+    m = re.search(r"\b(?:company|organisation|organization|employer)\s*[:\-]\s*([A-Za-z0-9&.\'\- ]{2,60})", str(raw), re.I)
+    if m:
+        return " ".join(m.group(1).split(".")[0].split()[:5]) or None
+    m = re.search(r"\b([A-Z][A-Za-z0-9&.\'-]*(?:\s+[A-Z][A-Za-z0-9&.\'-]*){0,3}\s+(?:Pvt\.?\s*Ltd\.?|Private Limited|Limited|Ltd\.?|Inc\.?|LLC|LLP|Technologies|Solutions|Systems|Labs))\b", str(raw))
+    return m.group(1) if m else None
+
+
 def verify_company(raw):
     """Website / LinkedIn / corporate-email verification -> 0-100 + status."""
     urls = URL_RE.findall(raw)
@@ -65,13 +112,28 @@ def verify_company(raw):
         None,
     )
     corporate = next((e for e in emails if e.split("@")[-1].lower() not in FREE_MAIL), None)
-    checks = {"website": bool(website), "linkedin": bool(linkedin), "email_domain": bool(corporate)}
+    company_name = extract_company_name(raw)
+    corporate_domain = corporate.split("@")[-1].lower() if corporate else None
+
+    # Verification must not depend on URLs in the posting: resolve the named
+    # company against trusted public sources when details are missing.
+    sources = []
+    if company_name and not (website and linkedin and corporate_domain):
+        found = lookup_company(company_name)
+        website = website or found["website"]
+        linkedin = linkedin or found["linkedin"]
+        corporate_domain = corporate_domain or found["email_domain"]
+        sources = found["sources"]
+
+    checks = {"website": bool(website), "linkedin": bool(linkedin), "email_domain": bool(corporate_domain)}
     score = round(sum(checks.values()) / 3 * 100)
     status = "verified" if score == 100 else ("partial" if score > 0 else "unverified")
     return {
         "website": website,
         "linkedin": linkedin,
-        "email_domain": corporate.split("@")[-1].lower() if corporate else None,
+        "company_name": company_name,
+        "email_domain": corporate_domain,
+        "lookup_sources": sources,
         "checks": checks,
         "score": score,
         "status": status,
