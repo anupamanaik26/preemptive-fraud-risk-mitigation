@@ -76,10 +76,16 @@ export function CompanyVerificationCard({ result }: { result: PredictionResult }
       </div>
 
       <ul className="grid gap-3 sm:grid-cols-3">
-        <Row icon={<Globe className="size-4" />} label="Official website" ok={v.checks.website} value={v.website} />
-        <Row icon={<Linkedin className="size-4" />} label="LinkedIn page" ok={v.checks.linkedin} value={v.linkedin} />
-        <Row icon={<Mail className="size-4" />} label="Corporate email domain" ok={v.checks.emailDomain} value={v.emailDomain} />
+        <Row icon={<Globe className="size-4" />} label="Official website" ok={v.checks.website} value={v.website} origin={v.origin?.website} />
+        <Row icon={<Linkedin className="size-4" />} label="LinkedIn page" ok={v.checks.linkedin} value={v.linkedin} origin={v.origin?.linkedin} />
+        <Row icon={<Mail className="size-4" />} label="Corporate email domain" ok={v.checks.emailDomain} value={v.emailDomain} origin={v.origin?.emailDomain} />
       </ul>
+
+      {v.lookupSources?.length > 0 && (
+        <p className="mt-4 text-[11px] text-muted-foreground">
+          Checked against public sources: {v.lookupSources.join(" · ")}
+        </p>
+      )}
 
       {v.notes.length > 0 && (
         <ul className="mt-4 space-y-2">
