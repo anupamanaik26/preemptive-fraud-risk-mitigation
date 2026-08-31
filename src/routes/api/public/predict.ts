@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { predictFraud, MODEL_ACCURACY } from "@/lib/fraud-model";
+import { extractPostingCompanyDetails } from "@/lib/scam-features";
+
 
 const bodySchema = z.object({
   job_description: z.string().min(1).max(20000),
