@@ -11,3 +11,4 @@ sentence-transformers==3.0.1
 torch==2.4.1
 transformers==4.44.2
 shap==0.46.0
+requests==2.32.3
