@@ -232,11 +232,19 @@ function extractEmails(raw: string): string[] {
   return raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) ?? [];
 }
 
+/** Trim a captured name to the company itself (first clause, max 5 words). */
+function tidyName(value: string): string | null {
+  const first = value.split(/[.,;\n|]/)[0] ?? "";
+  const words = first.trim().split(/\s+/).filter(Boolean).slice(0, 5);
+  const name = words.join(" ").replace(/[-\s]+$/, "");
+  return name.length >= 2 ? name : null;
+}
+
 export function extractCompanyName(raw: string): string | null {
   const labelled = raw.match(
     /\b(?:company|organi[sz]ation|employer|hiring partner)\s*[:\-]\s*([A-Za-z0-9&.,'\- ]{2,60})/i,
   );
-  if (labelled?.[1]) return labelled[1].trim().replace(/[.,]$/, "");
+  if (labelled?.[1]) return tidyName(labelled[1]);
 
   const suffix = raw.match(
     /\b([A-Z][A-Za-z0-9&.'-]*(?:\s+[A-Z][A-Za-z0-9&.'-]*){0,3}\s+(?:Pvt\.?\s*Ltd\.?|Private Limited|Limited|Ltd\.?|Inc\.?|LLC|LLP|Technologies|Solutions|Systems|Labs|Softwares?))\b/,
