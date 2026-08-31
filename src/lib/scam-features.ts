@@ -21,6 +21,16 @@ export interface FeatureHit {
   points: number;
 }
 
+export type EvidenceSource = "posting" | "public-lookup";
+
+/** Details resolved from trusted public directories when the posting omits them. */
+export interface CompanyLookupResult {
+  website: string | null;
+  linkedin: string | null;
+  emailDomain: string | null;
+  sources: string[];
+}
+
 export interface CompanyVerification {
   companyName: string | null;
   website: string | null;
@@ -31,10 +41,19 @@ export interface CompanyVerification {
     linkedin: boolean;
     emailDomain: boolean;
   };
+  /** where each satisfied check came from */
+  origin: {
+    website: EvidenceSource | null;
+    linkedin: EvidenceSource | null;
+    emailDomain: EvidenceSource | null;
+  };
+  /** public directories consulted for the lookup */
+  lookupSources: string[];
   score: number; // 0-100
   status: VerificationStatus;
   notes: string[];
 }
+
 
 export interface ShapContribution {
   feature: string;
