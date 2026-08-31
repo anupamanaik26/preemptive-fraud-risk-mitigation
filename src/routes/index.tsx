@@ -6,7 +6,7 @@ import { PredictionForm } from "@/components/PredictionForm";
 import { ResultCard } from "@/components/ResultCard";
 import { RiskMeter } from "@/components/RiskMeter";
 import { ShapExplanation } from "@/components/ShapExplanation";
-import { CompanyVerificationCard } from "@/components/CompanyVerificationCard";
+
 import { Dashboard } from "@/components/Dashboard";
 import { History, type HistoryItem } from "@/components/History";
 import type { PredictionResult } from "@/lib/fraud-model";
@@ -128,10 +128,8 @@ function Index() {
           <div className="space-y-6">
             <ResultCard result={result} />
             <RiskMeter result={result} />
-            <div className="grid gap-6 lg:grid-cols-2">
-              <ShapExplanation result={result} />
-              <CompanyVerificationCard result={result} />
-            </div>
+            <ShapExplanation result={result} />
+
           </div>
         )}
 
