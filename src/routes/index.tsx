@@ -9,6 +9,10 @@ import { ShapExplanation } from "@/components/ShapExplanation";
 
 import { Dashboard } from "@/components/Dashboard";
 import { History, type HistoryItem } from "@/components/History";
+import { FEATURE_FLAGS } from "@/features/insights/flags";
+import { ScamSignalsPanel } from "@/components/new/ScamSignalsPanel";
+import { WhyFlaggedPanel } from "@/components/new/WhyFlaggedPanel";
+import { ThresholdControl } from "@/components/new/ThresholdControl";
 import type { PredictionResult } from "@/lib/fraud-model";
 
 export const Route = createFileRoute("/")({
@@ -129,6 +133,11 @@ function Index() {
             <ResultCard result={result} />
             <RiskMeter result={result} />
             <ShapExplanation result={result} />
+            {FEATURE_FLAGS.scamSignalsPanel && <ScamSignalsPanel result={result} />}
+            {FEATURE_FLAGS.whyFlaggedPanel && (
+              <WhyFlaggedPanel result={result} jobText={text} />
+            )}
+            {FEATURE_FLAGS.thresholdControl && <ThresholdControl result={result} />}
 
           </div>
         )}
