@@ -18,23 +18,27 @@ export interface WordContribution {
   weight: number;
 }
 
-export interface ResultWithExtras extends PredictionResult {
+interface Extras {
   /** Scam Signals checklist data */
   signals?: ScamSignal[];
-  /**
-   * Explainability word contributions. NOTE: the legacy response already
-   * uses `explanation` for a plain-text string, so the panel treats it as a
-   * list only when it actually is an array, and also accepts the alternate
-   * key `word_contributions`.
-   */
-  explanation?: string | WordContribution[];
   word_contributions?: WordContribution[];
   /** Raw fraud probability for the cost-sensitive threshold slider */
   fraud_probability?: number;
 }
 
+/**
+ * NOTE: the legacy response already uses `explanation` for a plain-text
+ * string, so the extras type re-declares it as a list-or-string union via
+ * Omit to stay assignable; consumers treat it as a list only when it is
+ * actually an array.
+ */
+export type ResultWithExtras = Omit<PredictionResult, "explanation"> &
+  Extras & {
+    explanation?: string | WordContribution[];
+  };
+
 export function getExtras(result: PredictionResult): ResultWithExtras {
-  return result as ResultWithExtras;
+  return result as unknown as ResultWithExtras;
 }
 
 /** Reads the word-weight list from `explanation` (array form) or `word_contributions`. */
@@ -49,11 +53,14 @@ export function getWordContributions(result: PredictionResult): WordContribution
         if (
           item &&
           typeof item === "object" &&
-          typeof (item as Record<string, unknown>).word === "string" &&
-          typeof (item as Record<string, unknown>).weight === "number"
+          typeof (item as Record<string, unknown>)["word"] === "string" &&
+          typeof (item as Record<string, unknown>)["weight"] === "number"
         ) {
           const entry = item as Record<string, unknown>;
-          parsed.push({ word: entry.word as string, weight: entry.weight as number });
+          parsed.push({
+            word: entry["word"] as string,
+            weight: entry["weight"] as number,
+          });
         }
       }
       if (parsed.length > 0) return parsed;
